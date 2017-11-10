@@ -27,19 +27,15 @@
 ;; WHERE: the list can only have up to 3 bullets
 
 (define SPACE " ")
-(define UP "up")
-(define DOWN "down")
 (define LEFT "left")
 (define RIGHT "right")
 
 ;; A Direction is one of
-;; -SAPCE
+;; -SPACE
 ;; INTERP: the fire control of spaceship
-;; -UP
-;; -DOWN
 ;; -LEFT
 ;; -RIGHT
-;; INTERP: represents the moving direction of objects on the canvas
+;; INTERP: represents the moving direction of spaceship on the canvas
 
 
 ;; Deconstructor Template
@@ -47,8 +43,6 @@
 #; (define (direction-fn direction)
      (cond
        [(string=? SPACE direction)...]
-       [(string=? UP direction)...]
-       [(string=? DOWN direction)...]
        [(string=? RIGHT direction)...]
        [(string=? LEFT direction)...]))
 
@@ -87,7 +81,7 @@
 ;; INTERP: the life/lives of spaceship
 ;; WHERE: 0<=life<=3
 
-(define-struct world (dir spaceship sb invaders ib score life tick))
+(define-struct world (dir spaceship invaders sb ib score life tick))
 ;; A World is (make-world Spaceship SB GOI IB Score Life Tick)
 ;; INTERP: represents a world with spaceship, invaders, spaceship's bullets
 ;;         invaders' bullets, score, life and tick number
@@ -95,7 +89,6 @@
 ;; Deconstructor Template
 ;; world-fn : World -> ???
 #; (define (world-fn world)
-     ...(direction-fn (world-dir world))...
      ...(spaceship-fn (world-spaceship world))...
      ...(goi-fn (world-invaders world))...
      ...(lob-fn (world-sb world))...
@@ -107,20 +100,20 @@
 (define WIDTH 520) ;; scene width in pixels
 (define HEIGHT 600) ;; scene height in pixels
 (define SPEED-SHIP 20)
-(define SPEED-BU 25)
-(define SPEED-IN 12.5)
-(define N 80)
+(define SPEED-BU 25) ;; speed of a bullet
+(define SPEED-IN 12.5) ;; speed of an invader
+(define N 80) ;; intermitting ticks between invader downward movement 
 (define MAX-LIVES 3)
 (define BACKGROUND (empty-scene WIDTH HEIGHT))
 (define INVADER-IMG (square 30 'solid 'red))
 (define SPACESHIP-IMG (rectangle 60 20 'solid 'black))
 (define SBULLET-IMG (circle 2 'solid 'black))
 (define IBULLET-IMG (circle 2 'solid 'red))
-(define MAX-SB 3)
-(define MAX-IB 10)
+(define MAX-SB 3) ;;maximum of spaceship bullets
+(define MAX-IB 10) ;;maximum of invader bullets
 (define EMPTY empty)
 (define SPACESHIP (make-posn 40 560))
-(define SPACESHIP1 (make-posn 160 560))
+;;(define SPACESHIP1 (make-posn 160 560))
 (define INVADERS
   (list (make-posn 100 180)
         (make-posn 140 180)
@@ -161,15 +154,15 @@
 
 
 
-(define WORLD-INIT (make-world RIGHT SPACESHIP EMPTY INVADERS EMPTY 0 3 0))
+(define WORLD-INIT (make-world RIGHT SPACESHIP INVADERS EMPTY EMPTY 0 3 0))
 
-(define INVADERS1 (list (make-posn 160 400)
-                        (make-posn 300 300)
-                        (make-posn 260 200)))
-(define IB (list (make-posn 300 200) (make-posn 400 100) (make-posn 200 200)))
-(define SB (list (make-posn 200 100) (make-posn 200 300) (make-posn 400 200)))
+;;(define INVADERS1 (list (make-posn 160 400)
+;;                        (make-posn 300 300)
+;;                        (make-posn 260 200)))
+;;(define IB (list (make-posn 300 200) (make-posn 400 100) (make-posn 200 200)))
+;;(define SB (list (make-posn 200 100) (make-posn 200 300) (make-posn 400 200)))
 
-(define WORLD-1 (make-world RIGHT SPACESHIP1 SB INVADERS1 IB 30 1 100))
+;;(define WORLD-1 (make-world RIGHT SPACESHIP1 SB INVADERS1 IB 30 1 100))
 
 ;;;; Signature
 ;; world-draw: World -> Image
@@ -191,7 +184,6 @@
 
 ;;;; Signature
 ;; draw-spaceship: Spaceship Image -> Image
-
 ;;;; Purpose
 ;; GIVEN: a spaceship and an image
 ;; RETURN: a new image with the spaceship drawn on the given image
@@ -281,8 +273,8 @@
                20
                img))
 ;;;; Test
-(world-draw WORLD-INIT)
-(world-draw WORLD-1)
+;;(world-draw WORLD-INIT)
+;;(world-draw WORLD-1)
 
 
 ;;;; Signature
@@ -293,15 +285,15 @@
 
 ;;;; Function Definition
 (define (world-step w)
-  (make-world
-   (world-dir w)
-   (move-spaceship w)
-   (move-sb w)
-   (move-invaders w)
-   (move-ib w)
-   (update-score w)
-   (update-life w)
-   (+ 1 (world-tick w))))
+  (remove-out-hit (make-world
+                   (world-dir w)
+                   (move-spaceship w)
+                   (move-invaders w)
+                   (move-sb w)
+                   (move-ib w)
+                   (world-score w)
+                   (world-life w)
+                   (world-tick w))))
 
 
 
@@ -325,21 +317,33 @@
 (define (move-spaceship w)
   (cond
     [(spaceship-hit? (world-spaceship w) (world-ib w)) SPACESHIP]
-    [(out? (world-spaceship w)) (ship-next-loc (world-spaceship w) (world-dir w)) ]
-    [else (ship-next-loc (world-spaceship w) (world-dir w))]))
+    [(out? (world-spaceship w)) (world-spaceship w)]
+    [else (world-spaceship (ship-next-loc w))]))
     
-;; ship-next-loc: World -> Spaceship
-(define (ship-next-loc posn dir)
+;; ship-next-loc: World -> World
+(define (ship-next-loc w)
   (cond
-    [(string=? UP dir) posn]
-    [(string=? DOWN dir) posn]
-    [(string=? SPACE dir) posn]
-    [(string=? RIGHT dir) (make-posn (+ (posn-x posn)
-                                        SPEED-SHIP)
-                                     (posn-y posn))]
-    [(string=? LEFT dir) (make-posn (- (posn-x posn)
-                                        SPEED-SHIP)
-                                     (posn-y posn))]))
+    [(string=? RIGHT (world-dir w)) (make-world "NO KEY"
+                                                (make-posn (+ (posn-x (world-spaceship w))
+                                                              SPEED-SHIP)
+                                                           (posn-y (world-spaceship w)))
+                                                (world-invaders w)
+                                                (world-sb w)
+                                                (world-ib w)
+                                                (world-score w)
+                                                (world-life w)
+                                                (world-tick w))]
+    [(string=? LEFT (world-dir w)) (make-world "NO KEY"
+                                               (make-posn (- (posn-x (world-spaceship w))
+                                                             SPEED-SHIP)
+                                                          (posn-y (world-spaceship w)))
+                                               (world-invaders w)
+                                                (world-sb w)
+                                                (world-ib w)
+                                                (world-score w)
+                                                (world-life w)
+                                                (world-tick w))]
+    [else (world-spaceship w)]))
 
 ;; spaceship-hit?: Spaceship IB -> Boolean
 (define (spaceship-hit? loc ib)
@@ -349,11 +353,11 @@
                              (posn-x (first ib))
                              (+ (posn-x loc) 30))
                          (<= (- (posn-y loc) 10)
-                             (posn-y (first ib))
-                             (+ (posn-y loc) 10)))
+                             (posn-y (first ib))))
                     (spaceship-hit? loc (rest ib)))]))
 
 ;; out? : Posn -> Boolean
+;; TODO
 (define (out? posn)
   (or (or (> (posn-x posn) WIDTH)
           (< (posn-x posn) 0))
@@ -382,8 +386,7 @@
 
 (define (move-sb w)
   (bullets-move-up
-   (fire-sb
-    (remove-out-hit w))
+   (fire-sb w)
    SPEED-BU))
 
 ;; fire-sb: World -> SB
@@ -403,9 +406,7 @@
     [(cons? lop) (+ 1
                     (p-number (rest lop)))]))
 
-
-;;(define-struct world (dir spaceship sb invaders ib score life tick))
-;; bullets-move-up: World -> World
+;; bullets-move-up:  TODO
 (define (bullets-move-up sb speed)
   (cond
     [(empty? sb) sb]
@@ -422,14 +423,14 @@
 
 ;; remove-out-hit: World -> World
 (define (remove-out-hit w)
-  (make-world (world-dir w)
+  (make-world  (world-dir w)
               (world-spaceship w)
               (remove-sb (world-sb w) (world-invaders w))
               (remove-invaders (world-sb w) (world-invaders w))
               (remove-ib (world-ib w))
-              (world-score w)
-              (world-life w)
-              (world-tick w)))
+              (update-score w)
+              (update-life w)
+              (+ 1 (world-tick w))))
 
 ;; remove-sb: SB GOI-> SB
 (define (remove-sb sb invaders)
@@ -464,8 +465,7 @@
   (and (>= (+ (posn-x p2) 15)
            (posn-x p1)
            (- (posn-x p2) 15))
-       (>= (+ (posn-y p2) 15)
-           (posn-y p1)
+       (>= (posn-y p1)
            (- (posn-y p2) 15))))
 
 
@@ -474,16 +474,16 @@
   (cond
     [(empty? sb) invaders]
     [(cons? sb) (if (invader-hit? (first sb) invaders)
-                    (remove (rest sb) (remove-hit-invaders (first sb) invaders))
+                    (remove (rest sb) (remove-hitted-invader (first sb) invaders))
                     (remove-invaders (rest sb) invaders))]))
 ;; remove-hit-invaders: Posn GOI -> GOI
-(define (remove-hit-invaders posn invaders)
+(define (remove-hitted-invader posn invaders)
   (cond
     [(empty? invaders) invaders]
     [(cons? invaders) (if (invader-range? posn (first invaders))
                           (rest invaders)
                           (cons (first invaders)
-                                (remove-hit-invaders posn (rest invaders))))]))
+                                (remove-hitted-invader posn (rest invaders))))]))
 
 
 ;;remove-ib: IB -> IB
@@ -514,9 +514,9 @@
 ;                                                                                                          
 ;; move-invaders: World -> GOI
 (define (move-invaders w)
-  (if (= (remainder (world-tick (remove-out-hit w)) N) 0)
-      (move-down (world-invaders (remove-out-hit w)) SPEED-IN)
-      (world-invaders (remove-out-hit w))))
+  (if (= (remainder (world-tick  N)) 0)
+      (move-down (world-invaders w) SPEED-IN)
+      (world-invaders w)))
 ;; move-down: LoP NonNegInteger -> LoP
 (define (move-down lop speed)
   (cond
@@ -550,8 +550,8 @@
 ;                                                          
 ;; move-ib: World -> IB
 (define (move-ib w)
-  (move-down (invaders-fire (world-ib (remove-out-hit w))
-                            (world-invaders (remove-out-hit w)))
+  (move-down (invaders-fire (world-ib w)
+                            (world-invaders w))
              SPEED-BU))
 ;; invaders-fire: World -> IB
 (define (invaders-fire ib invaders)
@@ -590,7 +590,7 @@
 (define (update-score w)
   (* 3
      (- 36
-        (p-number (world-invaders w)))))
+        (p-number (world-invaders (remove-out-hit w))))))
 ;; update-life: World -> Life
 (define (update-life w)
   (cond
@@ -626,23 +626,23 @@
   
 (define (key-handler w ke)
   (cond
-    [(or (key=? ke "up")
-         (key=? ke "down")
+    [(or
          (key=? ke "left")
          (key=? ke "right")
          (key=? ke " "))
      (make-world ke
                  (world-spaceship w)
-                 (world-sb w)
                  (world-invaders w)
+                 (world-sb w)
                  (world-ib w)
                  (world-score w)
                  (world-life w)
                  (world-tick w))]
            
     [else w]))
-(big-bang WORLD-INIT
-          (on-tick world-step 0.3)
-          (to-draw world-draw)
-          (stop-when end-game?)
+(big-bang
+    WORLD-INIT
+  (to-draw world-draw)
+  (on-tick world-step 0.3)
+  (stop-when end-game?)
           (on-key key-handler))
